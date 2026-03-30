@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPS NTP Monitor</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --orange: #db6d28;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 { font-size: 18px; font-weight: 600; }
+header h1 span { color: var(--accent); }
+.header-status {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  font-family: var(--mono);
+}
+.status-pill {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-nofix { background: rgba(248,81,73,0.15); color: var(--red); }
+.status-2d { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.status-3d { background: rgba(63,185,80,0.15); color: var(--green); }
+.status-unknown { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 16px;
+  padding: 16px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.card-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-body { padding: 16px; }
+
+/* Sky Plot */
+.sky-card { grid-row: 1 / 3; }
+.sky-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+}
+#skyplot {
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 1;
+}
+
+/* Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+.info-item { font-size: 13px; }
+.info-label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+.info-value { font-family: var(--mono); font-size: 14px; margin-top: 2px; }
+
+/* Satellite Table */
+.sat-table-wrap {
+  max-height: 340px;
+  overflow-y: auto;
+}
+.sat-table-wrap::-webkit-scrollbar { width: 6px; }
+.sat-table-wrap::-webkit-scrollbar-track { background: var(--card); }
+.sat-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  color: var(--text-dim);
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(48,54,61,0.5);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+tr:hover td { background: rgba(88,166,255,0.04); }
+.snr-bar {
+  height: 12px;
+  border-radius: 2px;
+  min-width: 2px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.snr-none { background: var(--border); width: 2px; }
+.snr-weak { background: var(--red); }
+.snr-fair { background: var(--yellow); }
+.snr-good { background: var(--green); }
+.snr-strong { background: var(--accent); }
+
+/* Chrony Sources */
+.chrony-table td, .chrony-table th { font-size: 11px; padding: 4px 8px; }
+.src-selected { color: var(--green); }
+.src-combined { color: var(--accent); }
+.src-not-combined { color: var(--text-dim); }
+.src-unusable { color: var(--red); }
+.src-maybe-error { color: var(--orange); }
+
+/* NTP Status */
+.ntp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.ntp-stat {
+  text-align: center;
+  padding: 8px;
+  background: rgba(48,54,61,0.3);
+  border-radius: 6px;
+}
+.ntp-stat .info-value { font-size: 18px; }
+.ntp-stat .info-label { margin-top: 4px; }
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+  .sky-card { grid-row: auto; }
+  .ntp-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>GPS</span> NTP Monitor</h1>
+  <div class="header-status">
+    <span id="fix-pill" class="status-pill status-unknown">---</span>
+    <span id="hdr-sats" style="color:var(--text-dim)">Sats: --/--</span>
+    <span id="hdr-time" style="color:var(--text-dim)">--:--:--Z</span>
+  </div>
+</header>
+
+<div class="dashboard">
+  <!-- Sky Plot (left, spans 2 rows) -->
+  <div class="card sky-card">
+    <div class="card-header">
+      Sky View
+      <span id="sky-sats-label" style="font-weight:400">--</span>
+    </div>
+    <div class="sky-container">
+      <canvas id="skyplot"></canvas>
+    </div>
+  </div>
+
+  <!-- GPS Info (top right) -->
+  <div class="card">
+    <div class="card-header">GPS Status</div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">Fix Mode</div>
+          <div class="info-value" id="gps-fix-mode">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">RMC Status</div>
+          <div class="info-value" id="gps-rmc">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Latitude</div>
+          <div class="info-value" id="gps-lat">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Longitude</div>
+          <div class="info-value" id="gps-lon">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Altitude</div>
+          <div class="info-value" id="gps-alt">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Speed</div>
+          <div class="info-value" id="gps-speed">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">HDOP</div>
+          <div class="info-value" id="gps-hdop">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">PDOP</div>
+          <div class="info-value" id="gps-pdop">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Mag Variation</div>
+          <div class="info-value" id="gps-magvar">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Data Age</div>
+          <div class="info-value" id="gps-age">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NTP / Chrony (bottom right) -->
+  <div class="card">
+    <div class="card-header">NTP Discipline (Chrony)</div>
+    <div class="card-body" style="padding:12px 16px;">
+      <div class="ntp-grid" id="ntp-grid">
+        <div class="ntp-stat">
+          <div class="info-value" id="ntp-stratum">--</div>
+          <div class="info-label">Stratum</div>
+        </div>
+        <div class="ntp-stat">
+          <div class="info-value" id="ntp-offset">--</div>
+          <div class="info-label">Sys Offset</div>
+        </div>
+        <div class="ntp-stat">
+          <div class="info-value" id="ntp-ref">--</div>
+          <div class="info-label">Reference</div>
+        </div>
+        <div class="ntp-stat">
+          <div class="info-value" id="ntp-freq">--</div>
+          <div class="info-label">Freq (ppm)</div>
+        </div>
+        <div class="ntp-stat">
+          <div class="info-value" id="ntp-rms">--</div>
+          <div class="info-label">RMS Offset</div>
+        </div>
+        <div class="ntp-stat">
+          <div class="info-value" id="ntp-leap">--</div>
+          <div class="info-label">Leap Status</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <table class="chrony-table">
+          <thead>
+            <tr><th>M</th><th>S</th><th>Source</th><th>St</th><th>Poll</th><th>Reach</th><th>LastRx</th><th>Offset</th></tr>
+          </thead>
+          <tbody id="chrony-sources"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Satellite Table (full width) -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-header">
+      Satellites
+      <span id="sat-count-label" style="font-weight:400">--</span>
+    </div>
+    <div class="sat-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>GNSS</th><th>PRN</th><th>Elev</th><th>Azim</th>
+            <th>SNR (dBHz)</th><th style="width:180px">Signal</th><th>Used</th>
+          </tr>
+        </thead>
+        <tbody id="sat-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Sky plot drawing
+// ---------------------------------------------------------------------------
+const CONSTELLATION_COLORS = {
+  GP: '#58a6ff', GPS: '#58a6ff',
+  GL: '#f97583', GLONASS: '#f97583',
+  GA: '#d2a8ff', Galileo: '#d2a8ff',
+  GB: '#ffa657', BeiDou: '#ffa657',
+  QZ: '#79c0ff', QZSS: '#79c0ff',
+  SB: '#8b949e', SBAS: '#8b949e',
+  IR: '#56d364', IRNSS: '#56d364',
+};
+
+function getColor(gnss) {
+  return CONSTELLATION_COLORS[gnss] || '#e6edf3';
+}
+
+function drawSkyPlot(canvas, satellites) {
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+  const cx = w / 2, cy = h / 2;
+  const r = Math.min(cx, cy) - 36;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Background circles (elevation rings)
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  for (let elev = 0; elev <= 90; elev += 30) {
+    const ring = r * (90 - elev) / 90;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ring, 0, Math.PI * 2);
+    ctx.stroke();
+    // Label
+    if (elev > 0 && elev < 90) {
+      ctx.fillStyle = '#484f58';
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(elev + '°', cx, cy - ring + 12);
+    }
+  }
+
+  // Horizon circle (0° elevation) - thicker
+  ctx.strokeStyle = '#484f58';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Cardinal directions
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  for (let az = 0; az < 360; az += 45) {
+    const rad = (az - 90) * Math.PI / 180;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + r * Math.cos(rad), cy + r * Math.sin(rad));
+    ctx.stroke();
+  }
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  ctx.font = 'bold 13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  dirs.forEach((d, i) => {
+    const az = i * 45;
+    const rad = (az - 90) * Math.PI / 180;
+    const lr = r + 18;
+    ctx.fillStyle = d === 'N' ? '#f85149' : '#8b949e';
+    ctx.fillText(d, cx + lr * Math.cos(rad), cy + lr * Math.sin(rad));
+  });
+
+  // Draw satellites
+  satellites.forEach(sat => {
+    const elev = sat.elevation;
+    const azim = sat.azimuth;
+    // Clamp elevation: negative elevations are below horizon but we still
+    // show them at the edge (at 0° elevation line or slightly beyond)
+    const clampedElev = Math.max(elev, -10);
+    const dist = r * (90 - clampedElev) / 90;
+    const azRad = (azim - 90) * Math.PI / 180;
+    const x = cx + dist * Math.cos(azRad);
+    const y = cy + dist * Math.sin(azRad);
+    const color = getColor(sat.gnss);
+
+    // Dot size based on SNR
+    const dotR = sat.snr > 0 ? Math.max(5, Math.min(10, sat.snr / 5)) : 4;
+
+    // Below horizon indicator - draw as hollow
+    if (elev < 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, dotR, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      // Fill opacity based on SNR
+      ctx.globalAlpha = sat.snr > 0 ? 0.9 : 0.3;
+      ctx.beginPath();
+      ctx.arc(x, y, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      if (sat.used) {
+        ctx.strokeStyle = '#3fb950';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // PRN label
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = '9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = sat.snr > 0 ? 0.9 : 0.5;
+    ctx.fillText(sat.prn, x, y - dotR - 4);
+    ctx.globalAlpha = 1;
+  });
+
+  // Legend
+  const legendY = h - 14;
+  const constellations = [...new Set(satellites.map(s => s.gnss))].sort();
+  let lx = 10;
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'left';
+  constellations.forEach(c => {
+    const name = {GP:'GPS', GL:'GLONASS', GA:'Galileo', GB:'BeiDou', QZ:'QZSS', SB:'SBAS', IR:'IRNSS'}[c] || c;
+    ctx.fillStyle = getColor(c);
+    ctx.beginPath();
+    ctx.arc(lx + 5, legendY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(name, lx + 13, legendY + 3);
+    lx += ctx.measureText(name).width + 24;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// SNR bar helper
+// ---------------------------------------------------------------------------
+function snrBar(snr) {
+  if (snr <= 0) return '<span class="snr-bar snr-none" style="width:2px"></span>';
+  let cls = 'snr-weak';
+  if (snr >= 30) cls = 'snr-strong';
+  else if (snr >= 20) cls = 'snr-good';
+  else if (snr >= 10) cls = 'snr-fair';
+  const w = Math.min(snr * 3, 150);
+  return `<span class="snr-bar ${cls}" style="width:${w}px"></span>`;
+}
+
+// ---------------------------------------------------------------------------
+// UI update
+// ---------------------------------------------------------------------------
+function updateUI(data) {
+  const gps = data.gps;
+  const chrony = data.chrony;
+
+  // Header
+  const pill = document.getElementById('fix-pill');
+  pill.textContent = gps.fix_status;
+  pill.className = 'status-pill ' + ({
+    'NO FIX': 'status-nofix', '2D FIX': 'status-2d', '3D FIX': 'status-3d',
+    'NO DATA': 'status-unknown', 'GPSD NOT RUNNING': 'status-unknown',
+  }[gps.fix_status] || 'status-unknown');
+
+  document.getElementById('hdr-sats').textContent =
+    `Seen ${gps.satellites_visible} / Used ${gps.satellites_used}`;
+  document.getElementById('hdr-time').textContent =
+    gps.timestamp ? gps.timestamp.split('T')[1] || gps.timestamp : '--:--:--Z';
+
+  // GPS info
+  const modeText = {0:'Unknown', 1:'No Fix', 2:'2D', 3:'3D'}[gps.fix_mode] || '--';
+  document.getElementById('gps-fix-mode').textContent = modeText;
+
+  const rmcText = gps.rmc_status === 'A' ? 'Active (Valid)' :
+                  gps.rmc_status === 'V' ? 'Void (Invalid)' : '--';
+  const rmcEl = document.getElementById('gps-rmc');
+  rmcEl.textContent = rmcText;
+  rmcEl.style.color = gps.rmc_status === 'A' ? 'var(--green)' : gps.rmc_status === 'V' ? 'var(--red)' : '';
+
+  document.getElementById('gps-lat').textContent =
+    gps.latitude != null ? gps.latitude.toFixed(6) + '°' : 'n/a';
+  document.getElementById('gps-lon').textContent =
+    gps.longitude != null ? gps.longitude.toFixed(6) + '°' : 'n/a';
+  document.getElementById('gps-alt').textContent =
+    gps.altitude != null ? gps.altitude.toFixed(1) + ' m' : 'n/a';
+  document.getElementById('gps-speed').textContent =
+    gps.speed != null ? gps.speed.toFixed(1) + ' kn' : 'n/a';
+  document.getElementById('gps-hdop').textContent =
+    gps.hdop != null ? gps.hdop.toFixed(1) : 'n/a';
+  document.getElementById('gps-pdop').textContent =
+    gps.pdop != null ? gps.pdop.toFixed(1) : 'n/a';
+  document.getElementById('gps-magvar').textContent =
+    gps.mag_var != null ? gps.mag_var.toFixed(1) + '°' : 'n/a';
+  document.getElementById('gps-age').textContent =
+    gps.age_seconds != null ? gps.age_seconds.toFixed(0) + 's' : '--';
+
+  // Sky plot
+  const canvas = document.getElementById('skyplot');
+  drawSkyPlot(canvas, gps.satellites || []);
+  document.getElementById('sky-sats-label').textContent =
+    `Seen ${gps.satellites_visible} / Used ${gps.satellites_used}`;
+
+  // Satellite table
+  const tbody = document.getElementById('sat-tbody');
+  const sats = (gps.satellites || []).slice().sort((a, b) => {
+    // Sort: used first, then by constellation, then by PRN
+    if (a.used !== b.used) return b.used - a.used;
+    if (a.gnss !== b.gnss) return a.gnss.localeCompare(b.gnss);
+    return a.prn - b.prn;
+  });
+  tbody.innerHTML = sats.map(s => {
+    const usedMark = s.used ? '<span style="color:var(--green)">YES</span>' : '<span style="color:var(--text-dim)">no</span>';
+    const elevColor = s.elevation < 0 ? 'color:var(--text-dim)' : '';
+    return `<tr>
+      <td><span style="color:${getColor(s.gnss)}">${s.constellation}</span></td>
+      <td>${s.prn}</td>
+      <td style="${elevColor}">${s.elevation.toFixed(0)}°</td>
+      <td>${s.azimuth.toFixed(0)}°</td>
+      <td>${s.snr > 0 ? s.snr.toFixed(0) : '--'}</td>
+      <td>${snrBar(s.snr)} ${s.snr > 0 ? s.snr.toFixed(0) : ''}</td>
+      <td>${usedMark}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('sat-count-label').textContent =
+    `${sats.length} satellites (${sats.filter(s => s.snr > 0).length} with signal)`;
+
+  // Chrony
+  if (chrony && chrony.available && chrony.tracking) {
+    const t = chrony.tracking;
+    document.getElementById('ntp-stratum').textContent = t.stratum ?? '--';
+    document.getElementById('ntp-offset').textContent = t.system_time || '--';
+    document.getElementById('ntp-ref').textContent = t.ref_name || '--';
+    document.getElementById('ntp-freq').textContent =
+      t.frequency_ppm != null ? t.frequency_ppm.toFixed(2) : '--';
+    document.getElementById('ntp-rms').textContent = t.rms_offset || '--';
+    document.getElementById('ntp-leap').textContent = t.leap_status || '--';
+
+    // Sources table
+    const stbody = document.getElementById('chrony-sources');
+    stbody.innerHTML = (chrony.sources || []).map(s => {
+      const modeIcon = {server: '^', refclock: '#', peer: '='}[s.mode] || s.mode;
+      const stateClass = {
+        selected: 'src-selected', combined: 'src-combined',
+        not_combined: 'src-not-combined', unusable: 'src-unusable',
+        maybe_error: 'src-maybe-error', too_variable: 'src-unusable',
+      }[s.state] || '';
+      return `<tr>
+        <td>${modeIcon}</td>
+        <td class="${stateClass}">${s.state_char}</td>
+        <td title="${s.name}">${s.name.length > 24 ? s.name.slice(0,22)+'…' : s.name}</td>
+        <td>${s.stratum ?? ''}</td>
+        <td>${s.poll ?? ''}</td>
+        <td>${s.reach}</td>
+        <td>${s.last_rx}</td>
+        <td style="font-family:var(--mono);font-size:10px">${s.last_sample}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    document.getElementById('ntp-stratum').textContent = '--';
+    document.getElementById('ntp-ref').textContent = 'N/A';
+    document.getElementById('chrony-sources').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;color:var(--text-dim)">Chrony not available</td></tr>';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Polling loop
+// ---------------------------------------------------------------------------
+let pollInterval = null;
+
+async function poll() {
+  try {
+    const resp = await fetch('/api/status');
+    if (resp.ok) {
+      const data = await resp.json();
+      updateUI(data);
+    }
+  } catch (e) {
+    console.error('Poll error:', e);
+  }
+}
+
+// Initial load + 2s interval
+poll();
+pollInterval = setInterval(poll, 2000);
+
+// Resize handler for sky plot
+window.addEventListener('resize', () => {
+  // Redraw on resize by triggering a poll
+  poll();
+});
+</script>
+</body>
+</html>
