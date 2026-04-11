@@ -21,13 +21,13 @@ fi
 echo "[1/7] Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
-    gpsd gpsd-clients \
+    gpsd gpsd-clients python3-gps \
     chrony \
     python3 python3-venv python3-pip \
     pps-tools \
     > /dev/null
 
-echo "  Installed: gpsd, chrony, python3, pps-tools"
+echo "  Installed: gpsd, chrony, python3, python3-gps, pps-tools"
 
 # ---------------------------------------------------------------------------
 # 2. Configure gpsd
@@ -79,7 +79,7 @@ cp -r gpssat "$INSTALL_DIR/"
 cp requirements.txt "$INSTALL_DIR/"
 
 # Create virtual environment
-python3 -m venv "$INSTALL_DIR/venv"
+python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
 "$INSTALL_DIR/venv/bin/pip" install --quiet -r "$INSTALL_DIR/requirements.txt"
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
