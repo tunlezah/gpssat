@@ -216,6 +216,39 @@ def test_signal_strength_distribution():
         assert 0 <= s.snr <= 50, f"PRN {s.prn} has invalid SNR {s.snr}"
 
 
+def test_gga_fix_quality_and_geoid():
+    """GGA fix quality and geoid separation must be parsed."""
+    parser = NmeaParser()
+    # Standard GGA sentence with fix quality=1 (GPS), geoid sep = -33.5m
+    gga = "$GPGGA,120000.00,3512.5613,S,14900.6865,E,1,08,1.2,100.0,M,-33.5,M,,*42"
+    # Need to compute correct checksum
+    body = gga[1:].split("*")[0]
+    cksum = 0
+    for ch in body:
+        cksum ^= ord(ch)
+    gga_valid = f"${body}*{cksum:02X}"
+    parser.feed_nmea(gga_valid)
+    state = parser.state
+
+    assert state.fix_quality == 1
+    assert state.satellites_used == 8
+    assert state.hdop == 1.2
+    assert state.altitude == 100.0
+    assert state.geoid_sep == -33.5
+
+
+def test_gga_dgps_quality():
+    """GGA fix quality=2 must be recognised as DGPS."""
+    parser = NmeaParser()
+    body = "GPGGA,120000.00,3512.5613,S,14900.6865,E,2,10,0.9,100.0,M,-33.5,M,,"
+    cksum = 0
+    for ch in body:
+        cksum ^= ord(ch)
+    parser.feed_nmea(f"${body}*{cksum:02X}")
+    state = parser.state
+    assert state.fix_quality == 2
+
+
 def test_gpsd_json_tpv():
     """Test parsing of gpsd JSON TPV message."""
     parser = NmeaParser()
@@ -230,6 +263,90 @@ def test_gpsd_json_tpv():
     assert state.fix_mode == 1
     assert state.fix_valid is False
     assert state.timestamp == "2026-03-28T21:35:36.000Z"
+
+
+def test_gpsd_tpv_accuracy_estimates():
+    """TPV accuracy fields from UBX-NAV-PVT must be captured."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "TPV",
+        "mode": 3,
+        "status": 1,
+        "time": "2026-03-28T22:00:00.000Z",
+        "lat": -35.209355,
+        "lon": 149.011442,
+        "altMSL": 600.5,
+        "speed": 0.1,
+        "track": 180.0,
+        "eph": 5.2,
+        "epv": 8.1,
+        "eps": 0.3,
+        "ept": 0.000005,
+        "epd": 45.0,
+        "epc": 0.15,
+        "epx": 3.1,
+        "epy": 4.2,
+        "geoidSep": -33.2,
+        "magvar": 12.3,
+        "leapseconds": 18,
+    })
+    state = parser.state
+
+    assert state.fix_mode == 3
+    assert state.fix_valid is True
+    assert state.eph == 5.2
+    assert state.epv == 8.1
+    assert state.eps == 0.3
+    assert state.ept == 0.000005
+    assert state.epd == 45.0
+    assert state.epc == 0.15
+    assert state.epx == 3.1
+    assert state.epy == 4.2
+    assert state.geoid_sep == -33.2
+    assert state.mag_var == 12.3
+    assert state.leap_seconds == 18
+    assert state.altitude == 600.5
+
+
+def test_gpsd_tpv_ecef_and_velocity():
+    """TPV ECEF coordinates and velocity components must be captured."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "TPV",
+        "mode": 3,
+        "status": 1,
+        "ecefx": -4467985.0,
+        "ecefy": 2684032.0,
+        "ecefz": -3667006.0,
+        "ecefpAcc": 12.5,
+        "velN": 0.01,
+        "velE": -0.02,
+        "velD": 0.005,
+    })
+    state = parser.state
+
+    assert state.ecef_x == -4467985.0
+    assert state.ecef_y == 2684032.0
+    assert state.ecef_z == -3667006.0
+    assert state.ecef_pacc == 12.5
+    assert state.vel_north == 0.01
+    assert state.vel_east == -0.02
+    assert state.vel_down == 0.005
+
+
+def test_gpsd_tpv_dgps_status():
+    """TPV status=2 must map to DGPS fix quality."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "TPV",
+        "mode": 3,
+        "status": 2,
+        "lat": -35.2, "lon": 149.0,
+    })
+    state = parser.state
+    assert state.status == 2
+    assert state.fix_quality == 2
+    assert "DGPS" in state.fix_status_text
 
 
 def test_gpsd_json_sky():
@@ -255,6 +372,126 @@ def test_gpsd_json_sky():
     assert by_prn[9].elevation == -55
 
 
+def test_gpsd_sky_signal_ids():
+    """SKY satellite signal IDs must be mapped to human-readable names."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "SKY",
+        "satellites": [
+            {"PRN": 1, "gnssid": 0, "sigid": 0, "el": 45, "az": 90, "ss": 30, "used": True},
+            {"PRN": 1, "gnssid": 0, "sigid": 3, "el": 45, "az": 90, "ss": 25, "used": False},
+            {"PRN": 1, "gnssid": 0, "sigid": 6, "el": 45, "az": 90, "ss": 20, "used": False},
+            {"PRN": 5, "gnssid": 2, "sigid": 0, "el": 30, "az": 180, "ss": 28, "used": True},
+            {"PRN": 5, "gnssid": 2, "sigid": 3, "el": 30, "az": 180, "ss": 22, "used": False},
+            {"PRN": 10, "gnssid": 6, "sigid": 0, "el": 60, "az": 270, "ss": 35, "used": True},
+            {"PRN": 10, "gnssid": 6, "sigid": 2, "el": 60, "az": 270, "ss": 30, "used": False},
+            {"PRN": 21, "gnssid": 3, "sigid": 0, "el": 20, "az": 45, "ss": 18, "used": False},
+        ],
+    })
+    state = parser.state
+
+    # Should have 8 satellite entries (multiple signals per PRN)
+    assert len(state.satellites) == 8
+
+    # Check signal IDs
+    sigs = {(s.prn, s.sig_id): s for s in state.satellites}
+    assert (1, "L1CA") in sigs   # GPS L1
+    assert (1, "L2CL") in sigs   # GPS L2
+    assert (1, "L5I") in sigs    # GPS L5
+    assert (5, "E1C") in sigs    # Galileo E1
+    assert (5, "E5aI") in sigs   # Galileo E5a
+    assert (10, "L1OF") in sigs  # GLONASS L1
+    assert (10, "L2OF") in sigs  # GLONASS L2
+    assert (21, "B1I") in sigs   # BeiDou B1
+
+
+def test_gpsd_sky_health_and_quality():
+    """SKY satellite health and quality indicators must be captured."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "SKY",
+        "satellites": [
+            {"PRN": 1, "gnssid": 0, "el": 45, "az": 90, "ss": 30, "used": True,
+             "health": 1, "qual": 7},
+            {"PRN": 2, "gnssid": 0, "el": 20, "az": 180, "ss": 15, "used": False,
+             "health": 2, "qual": 1},
+        ],
+    })
+    state = parser.state
+    by_prn = {s.prn: s for s in state.satellites}
+
+    assert by_prn[1].health == 1
+    assert by_prn[1].health_text == "OK"
+    assert by_prn[1].quality == 7
+    assert by_prn[1].quality_text == "Code+Carrier"
+
+    assert by_prn[2].health == 2
+    assert by_prn[2].health_text == "Unhealthy"
+    assert by_prn[2].quality == 1
+    assert by_prn[2].quality_text == "Searching"
+
+
+def test_gpsd_sky_extended_dops():
+    """SKY extended DOP values (GDOP, XDOP, YDOP) must be captured."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "SKY",
+        "hdop": 1.2, "vdop": 1.8, "pdop": 2.1, "tdop": 1.5,
+        "gdop": 2.5, "xdop": 0.8, "ydop": 0.9,
+        "satellites": [],
+    })
+    state = parser.state
+    assert state.hdop == 1.2
+    assert state.vdop == 1.8
+    assert state.pdop == 2.1
+    assert state.tdop == 1.5
+    assert state.gdop == 2.5
+    assert state.xdop == 0.8
+    assert state.ydop == 0.9
+
+
+def test_gpsd_devices_parsing():
+    """DEVICES message must extract driver, firmware, and device info."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "DEVICES",
+        "devices": [{
+            "class": "DEVICE",
+            "path": "/dev/ttyACM0",
+            "driver": "u-blox",
+            "subtype": "SW EXT CORE 1.00 (3fda8e),HW 00190000",
+            "bps": 9600,
+            "cycle": 1.0,
+            "flags": 1,
+        }],
+    })
+    state = parser.state
+    assert state.device_driver == "u-blox"
+    assert "SW EXT CORE" in state.device_subtype
+    assert state.device_path == "/dev/ttyACM0"
+    assert state.device_baud == 9600
+    assert state.device_cycle == 1.0
+
+
+def test_gpsd_pps_parsing():
+    """PPS message must compute timing offset."""
+    parser = NmeaParser()
+    parser.feed_json({
+        "class": "PPS",
+        "device": "/dev/ttyACM0",
+        "real_sec": 1711662000,
+        "real_nsec": 0,
+        "clock_sec": 1711662000,
+        "clock_nsec": 500,
+        "precision": -20,
+    })
+    state = parser.state
+    # Offset = real - clock = 0 - 500ns = -0.0000005s
+    assert state.pps_offset is not None
+    assert abs(state.pps_offset - (-500e-9)) < 1e-12
+    assert state.pps_precision == -20
+
+
 def test_state_dict_serialization():
     """to_dict() must produce valid JSON-serializable output."""
     parser = NmeaParser()
@@ -267,7 +504,7 @@ def test_state_dict_serialization():
     assert d["satellites_visible"] == 22
     assert d["satellites_used"] == 0
     assert len(d["satellites"]) == 22
-    # Check a satellite dict
+    # Check a satellite dict has all fields including new ones
     sat0 = d["satellites"][0]
     assert "gnss" in sat0
     assert "prn" in sat0
@@ -276,6 +513,63 @@ def test_state_dict_serialization():
     assert "snr" in sat0
     assert "used" in sat0
     assert "constellation" in sat0
+    assert "sig_id" in sat0
+    assert "health" in sat0
+    assert "health_text" in sat0
+    assert "quality" in sat0
+    assert "quality_text" in sat0
+
+    # Check new top-level fields are present
+    assert "gdop" in d
+    assert "eph" in d
+    assert "epv" in d
+    assert "fix_quality" in d
+    assert "fix_quality_text" in d
+    assert "geoid_sep" in d
+    assert "pps_offset" in d
+    assert "device_driver" in d
+    assert "ecef_x" in d
+    assert "vel_north" in d
+    assert "leap_seconds" in d
+
+    import json
+    json.dumps(d)  # Must not raise
+
+
+def test_state_dict_with_full_data():
+    """to_dict() with full gpsd data must serialize all fields."""
+    parser = NmeaParser()
+    # Feed TPV with accuracy data
+    parser.feed_json({
+        "class": "TPV", "mode": 3, "status": 2,
+        "time": "2026-04-01T12:00:00Z",
+        "lat": -35.2, "lon": 149.0, "altMSL": 600.0,
+        "eph": 3.5, "epv": 5.0, "leapseconds": 18,
+    })
+    # Feed SKY with signal IDs
+    parser.feed_json({
+        "class": "SKY",
+        "gdop": 2.5, "hdop": 1.1, "vdop": 1.5, "pdop": 1.8, "tdop": 1.2,
+        "satellites": [
+            {"PRN": 1, "gnssid": 0, "sigid": 0, "el": 45, "az": 90, "ss": 30,
+             "used": True, "health": 1, "qual": 7},
+        ],
+    })
+    # Feed DEVICES
+    parser.feed_json({
+        "class": "DEVICES",
+        "devices": [{"driver": "u-blox", "subtype": "FW 3.01", "path": "/dev/ttyACM0", "bps": 9600, "cycle": 1.0}],
+    })
+    d = parser.state.to_dict()
+
+    assert d["fix_status"] == "3D FIX (DGPS)"
+    assert d["gdop"] == 2.5
+    assert d["eph"] == 3.5
+    assert d["leap_seconds"] == 18
+    assert d["device_driver"] == "u-blox"
+    assert d["satellites"][0]["sig_id"] == "L1CA"
+    assert d["satellites"][0]["health_text"] == "OK"
+    assert d["satellites"][0]["quality_text"] == "Code+Carrier"
 
     import json
     json.dumps(d)  # Must not raise

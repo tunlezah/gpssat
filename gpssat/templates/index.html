@@ -193,6 +193,7 @@ tr:hover td { background: rgba(88,166,255,0.04); }
   <h1><span>GPS</span> NTP Monitor</h1>
   <div class="header-status">
     <span id="fix-pill" class="status-pill status-unknown">---</span>
+    <span id="hdr-qual" class="status-pill status-unknown" style="display:none"></span>
     <span id="hdr-sats" style="color:var(--text-dim)">Sats: --/--</span>
     <span id="hdr-time" style="color:var(--text-dim)">--:--:--Z</span>
   </div>
@@ -220,8 +221,8 @@ tr:hover td { background: rgba(88,166,255,0.04); }
           <div class="info-value" id="gps-fix-mode">--</div>
         </div>
         <div class="info-item">
-          <div class="info-label">RMC Status</div>
-          <div class="info-value" id="gps-rmc">--</div>
+          <div class="info-label">Fix Quality</div>
+          <div class="info-value" id="gps-fix-qual">--</div>
         </div>
         <div class="info-item">
           <div class="info-label">Latitude</div>
@@ -236,16 +237,16 @@ tr:hover td { background: rgba(88,166,255,0.04); }
           <div class="info-value" id="gps-alt">--</div>
         </div>
         <div class="info-item">
+          <div class="info-label">Geoid Sep</div>
+          <div class="info-value" id="gps-geoid">--</div>
+        </div>
+        <div class="info-item">
           <div class="info-label">Speed</div>
           <div class="info-value" id="gps-speed">--</div>
         </div>
         <div class="info-item">
-          <div class="info-label">HDOP</div>
-          <div class="info-value" id="gps-hdop">--</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">PDOP</div>
-          <div class="info-value" id="gps-pdop">--</div>
+          <div class="info-label">Track</div>
+          <div class="info-value" id="gps-track">--</div>
         </div>
         <div class="info-item">
           <div class="info-label">Mag Variation</div>
@@ -254,6 +255,29 @@ tr:hover td { background: rgba(88,166,255,0.04); }
         <div class="info-item">
           <div class="info-label">Data Age</div>
           <div class="info-value" id="gps-age">--</div>
+        </div>
+      </div>
+      <!-- DOP values -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+        <div class="info-label" style="margin-bottom:6px;">Dilution of Precision</div>
+        <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;">
+          <div class="info-item"><div class="info-label">HDOP</div><div class="info-value" id="gps-hdop">--</div></div>
+          <div class="info-item"><div class="info-label">VDOP</div><div class="info-value" id="gps-vdop">--</div></div>
+          <div class="info-item"><div class="info-label">PDOP</div><div class="info-value" id="gps-pdop">--</div></div>
+          <div class="info-item"><div class="info-label">TDOP</div><div class="info-value" id="gps-tdop">--</div></div>
+          <div class="info-item"><div class="info-label">GDOP</div><div class="info-value" id="gps-gdop">--</div></div>
+        </div>
+      </div>
+      <!-- Accuracy estimates -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+        <div class="info-label" style="margin-bottom:6px;">Accuracy Estimates (UBX-NAV)</div>
+        <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;">
+          <div class="info-item"><div class="info-label">Horiz Pos</div><div class="info-value" id="gps-eph">--</div></div>
+          <div class="info-item"><div class="info-label">Vert Pos</div><div class="info-value" id="gps-epv">--</div></div>
+          <div class="info-item"><div class="info-label">Time</div><div class="info-value" id="gps-ept">--</div></div>
+          <div class="info-item"><div class="info-label">Speed</div><div class="info-value" id="gps-eps">--</div></div>
+          <div class="info-item"><div class="info-label">Direction</div><div class="info-value" id="gps-epd">--</div></div>
+          <div class="info-item"><div class="info-label">Climb</div><div class="info-value" id="gps-epc">--</div></div>
         </div>
       </div>
     </div>
@@ -300,6 +324,23 @@ tr:hover td { background: rgba(88,166,255,0.04); }
     </div>
   </div>
 
+  <!-- Receiver Info (full width) -->
+  <div class="card" id="receiver-card" style="grid-column: 1 / -1;">
+    <div class="card-header">u-blox Receiver</div>
+    <div class="card-body" style="padding:12px 16px;">
+      <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+        <div class="info-item"><div class="info-label">Driver</div><div class="info-value" id="dev-driver">--</div></div>
+        <div class="info-item"><div class="info-label">Firmware</div><div class="info-value" id="dev-subtype">--</div></div>
+        <div class="info-item"><div class="info-label">Device</div><div class="info-value" id="dev-path">--</div></div>
+        <div class="info-item"><div class="info-label">Baud</div><div class="info-value" id="dev-baud">--</div></div>
+        <div class="info-item"><div class="info-label">Update Cycle</div><div class="info-value" id="dev-cycle">--</div></div>
+        <div class="info-item"><div class="info-label">PPS Offset</div><div class="info-value" id="dev-pps">--</div></div>
+        <div class="info-item"><div class="info-label">Leap Seconds</div><div class="info-value" id="dev-leap">--</div></div>
+        <div class="info-item"><div class="info-label">ECEF Accuracy</div><div class="info-value" id="dev-ecef-acc">--</div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Satellite Table (full width) -->
   <div class="card" style="grid-column: 1 / -1;">
     <div class="card-header">
@@ -310,8 +351,8 @@ tr:hover td { background: rgba(88,166,255,0.04); }
       <table>
         <thead>
           <tr>
-            <th>GNSS</th><th>PRN</th><th>Elev</th><th>Azim</th>
-            <th>SNR (dBHz)</th><th style="width:180px">Signal</th><th>Used</th>
+            <th>GNSS</th><th>PRN</th><th>Signal</th><th>Elev</th><th>Azim</th>
+            <th>SNR (dBHz)</th><th style="width:150px">Strength</th><th>Qual</th><th>Health</th><th>Used</th>
           </tr>
         </thead>
         <tbody id="sat-tbody"></tbody>
@@ -479,17 +520,32 @@ function snrBar(snr) {
 // ---------------------------------------------------------------------------
 // UI update
 // ---------------------------------------------------------------------------
+function fmtDop(v) { return v != null ? v.toFixed(1) : 'n/a'; }
+function fmtM(v) { return v != null ? v.toFixed(2) + ' m' : 'n/a'; }
+function fmtDeg(v) { return v != null ? v.toFixed(1) + '\u00B0' : 'n/a'; }
+
 function updateUI(data) {
   const gps = data.gps;
   const chrony = data.chrony;
 
   // Header
   const pill = document.getElementById('fix-pill');
+  const fixBase = gps.fix_status.split('(')[0].trim();
   pill.textContent = gps.fix_status;
   pill.className = 'status-pill ' + ({
     'NO FIX': 'status-nofix', '2D FIX': 'status-2d', '3D FIX': 'status-3d',
     'NO DATA': 'status-unknown', 'GPSD NOT RUNNING': 'status-unknown',
-  }[gps.fix_status] || 'status-unknown');
+  }[fixBase] || 'status-3d');
+
+  // Show DGPS/RTK badge if applicable
+  const qualPill = document.getElementById('hdr-qual');
+  if (gps.fix_quality_text && gps.fix_quality_text !== 'GPS' && gps.fix_quality_text !== '') {
+    qualPill.textContent = gps.fix_quality_text;
+    qualPill.style.display = '';
+    qualPill.className = 'status-pill status-3d';
+  } else {
+    qualPill.style.display = 'none';
+  }
 
   document.getElementById('hdr-sats').textContent =
     `Seen ${gps.satellites_visible} / Used ${gps.satellites_used}`;
@@ -500,28 +556,44 @@ function updateUI(data) {
   const modeText = {0:'Unknown', 1:'No Fix', 2:'2D', 3:'3D'}[gps.fix_mode] || '--';
   document.getElementById('gps-fix-mode').textContent = modeText;
 
-  const rmcText = gps.rmc_status === 'A' ? 'Active (Valid)' :
-                  gps.rmc_status === 'V' ? 'Void (Invalid)' : '--';
-  const rmcEl = document.getElementById('gps-rmc');
-  rmcEl.textContent = rmcText;
-  rmcEl.style.color = gps.rmc_status === 'A' ? 'var(--green)' : gps.rmc_status === 'V' ? 'var(--red)' : '';
+  // Fix quality
+  const qualText = gps.fix_quality_text || ({0:'None', 1:'GPS SPS', 2:'DGPS', 3:'PPS',
+    4:'RTK Fixed', 5:'RTK Float', 6:'Estimated'}[gps.fix_quality] || '--');
+  const qualEl = document.getElementById('gps-fix-qual');
+  qualEl.textContent = qualText;
+  qualEl.style.color = gps.fix_quality >= 2 ? 'var(--accent)' : '';
 
   document.getElementById('gps-lat').textContent =
-    gps.latitude != null ? gps.latitude.toFixed(6) + '°' : 'n/a';
+    gps.latitude != null ? gps.latitude.toFixed(6) + '\u00B0' : 'n/a';
   document.getElementById('gps-lon').textContent =
-    gps.longitude != null ? gps.longitude.toFixed(6) + '°' : 'n/a';
+    gps.longitude != null ? gps.longitude.toFixed(6) + '\u00B0' : 'n/a';
   document.getElementById('gps-alt').textContent =
     gps.altitude != null ? gps.altitude.toFixed(1) + ' m' : 'n/a';
+  document.getElementById('gps-geoid').textContent =
+    gps.geoid_sep != null ? gps.geoid_sep.toFixed(1) + ' m' : 'n/a';
   document.getElementById('gps-speed').textContent =
     gps.speed != null ? gps.speed.toFixed(1) + ' kn' : 'n/a';
-  document.getElementById('gps-hdop').textContent =
-    gps.hdop != null ? gps.hdop.toFixed(1) : 'n/a';
-  document.getElementById('gps-pdop').textContent =
-    gps.pdop != null ? gps.pdop.toFixed(1) : 'n/a';
+  document.getElementById('gps-track').textContent =
+    gps.track != null ? gps.track.toFixed(1) + '\u00B0' : 'n/a';
   document.getElementById('gps-magvar').textContent =
-    gps.mag_var != null ? gps.mag_var.toFixed(1) + '°' : 'n/a';
+    gps.mag_var != null ? gps.mag_var.toFixed(1) + '\u00B0' : 'n/a';
   document.getElementById('gps-age').textContent =
     gps.age_seconds != null ? gps.age_seconds.toFixed(0) + 's' : '--';
+
+  // DOPs
+  document.getElementById('gps-hdop').textContent = fmtDop(gps.hdop);
+  document.getElementById('gps-vdop').textContent = fmtDop(gps.vdop);
+  document.getElementById('gps-pdop').textContent = fmtDop(gps.pdop);
+  document.getElementById('gps-tdop').textContent = fmtDop(gps.tdop);
+  document.getElementById('gps-gdop').textContent = fmtDop(gps.gdop);
+
+  // Accuracy estimates
+  document.getElementById('gps-eph').textContent = fmtM(gps.eph);
+  document.getElementById('gps-epv').textContent = fmtM(gps.epv);
+  document.getElementById('gps-ept').textContent = gps.ept != null ? (gps.ept * 1e6).toFixed(1) + ' \u00B5s' : 'n/a';
+  document.getElementById('gps-eps').textContent = gps.eps != null ? gps.eps.toFixed(2) + ' m/s' : 'n/a';
+  document.getElementById('gps-epd').textContent = fmtDeg(gps.epd);
+  document.getElementById('gps-epc').textContent = gps.epc != null ? gps.epc.toFixed(2) + ' m/s' : 'n/a';
 
   // Sky plot
   const canvas = document.getElementById('skyplot');
@@ -529,29 +601,59 @@ function updateUI(data) {
   document.getElementById('sky-sats-label').textContent =
     `Seen ${gps.satellites_visible} / Used ${gps.satellites_used}`;
 
+  // Receiver info
+  document.getElementById('dev-driver').textContent = gps.device_driver || 'n/a';
+  document.getElementById('dev-subtype').textContent = gps.device_subtype || 'n/a';
+  document.getElementById('dev-path').textContent = gps.device_path || 'n/a';
+  document.getElementById('dev-baud').textContent = gps.device_baud || 'n/a';
+  document.getElementById('dev-cycle').textContent = gps.device_cycle ? gps.device_cycle.toFixed(1) + 's' : 'n/a';
+  document.getElementById('dev-pps').textContent =
+    gps.pps_offset != null ? (gps.pps_offset * 1e6).toFixed(3) + ' \u00B5s' : 'n/a';
+  document.getElementById('dev-leap').textContent =
+    gps.leap_seconds != null ? gps.leap_seconds + 's' : 'n/a';
+  document.getElementById('dev-ecef-acc').textContent =
+    gps.ecef_pacc != null ? gps.ecef_pacc.toFixed(2) + ' m' : 'n/a';
+  // Hide receiver card if no device info yet
+  document.getElementById('receiver-card').style.display =
+    gps.device_driver ? '' : 'none';
+
   // Satellite table
   const tbody = document.getElementById('sat-tbody');
   const sats = (gps.satellites || []).slice().sort((a, b) => {
-    // Sort: used first, then by constellation, then by PRN
+    // Sort: used first, then by constellation, then by PRN, then by signal
     if (a.used !== b.used) return b.used - a.used;
     if (a.gnss !== b.gnss) return a.gnss.localeCompare(b.gnss);
-    return a.prn - b.prn;
+    if (a.prn !== b.prn) return a.prn - b.prn;
+    return (a.sig_id || '').localeCompare(b.sig_id || '');
   });
   tbody.innerHTML = sats.map(s => {
     const usedMark = s.used ? '<span style="color:var(--green)">YES</span>' : '<span style="color:var(--text-dim)">no</span>';
     const elevColor = s.elevation < 0 ? 'color:var(--text-dim)' : '';
+    const sigLabel = s.sig_id || '';
+    const healthMark = s.health === 1 ? '<span style="color:var(--green)">OK</span>'
+                     : s.health === 2 ? '<span style="color:var(--red)">BAD</span>'
+                     : '<span style="color:var(--text-dim)">--</span>';
+    const qualColor = s.quality >= 4 ? 'var(--green)' : s.quality >= 2 ? 'var(--yellow)' : 'var(--text-dim)';
+    const qualLabel = s.quality_text || (s.quality >= 0 ? s.quality : '--');
     return `<tr>
       <td><span style="color:${getColor(s.gnss)}">${s.constellation}</span></td>
       <td>${s.prn}</td>
-      <td style="${elevColor}">${s.elevation.toFixed(0)}°</td>
-      <td>${s.azimuth.toFixed(0)}°</td>
+      <td style="color:var(--accent);font-size:11px">${sigLabel}</td>
+      <td style="${elevColor}">${s.elevation.toFixed(0)}\u00B0</td>
+      <td>${s.azimuth.toFixed(0)}\u00B0</td>
       <td>${s.snr > 0 ? s.snr.toFixed(0) : '--'}</td>
       <td>${snrBar(s.snr)} ${s.snr > 0 ? s.snr.toFixed(0) : ''}</td>
+      <td style="color:${qualColor};font-size:11px">${qualLabel}</td>
+      <td>${healthMark}</td>
       <td>${usedMark}</td>
     </tr>`;
   }).join('');
+  // Count unique PRNs (since multi-signal may list same PRN twice)
+  const uniquePrns = new Set(sats.map(s => s.gnss + s.prn));
+  const sigTypes = new Set(sats.filter(s => s.sig_id).map(s => s.sig_id));
+  const sigInfo = sigTypes.size > 0 ? ` | Signals: ${[...sigTypes].sort().join(', ')}` : '';
   document.getElementById('sat-count-label').textContent =
-    `${sats.length} satellites (${sats.filter(s => s.snr > 0).length} with signal)`;
+    `${uniquePrns.size} satellites (${sats.filter(s => s.snr > 0).length} with signal)${sigInfo}`;
 
   // Chrony
   if (chrony && chrony.available && chrony.tracking) {
